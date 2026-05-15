@@ -1,0 +1,189 @@
+server:
+    port: 8080
+
+spring:
+    application:
+        name: api-gateway
+    
+    data:
+        redis:
+            host: localhost
+            port: 6379
+
+    cloud:
+        gateway:
+            discovery:
+                locator:
+                    # Disable automatic route creation to enforce explicit routing via the gateway filters.
+                    enabled: false
+                    lower-case-service-id: true
+
+            # Global CORS configuration mapped for the frontend domain requirements.
+            globalcors:
+                corsConfigurations:
+                    "[/**]":
+                        allowedOriginPatterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:5173,http://127.0.0.1:5173}
+                        allowedMethods:
+                            - GET
+                            - POST
+                            - PUT
+                            - PATCH
+                            - DELETE
+                            - OPTIONS
+                        allowedHeaders: "*"
+                        allowCredentials: true
+
+            # Deduplicate CORS headers specifically for Access-Control headers to ensure correct response parsing.
+            default-filters:
+                - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials Access-Control-Allow-Methods Access-Control-Allow-Headers, RETAIN_FIRST
+
+            routes:
+                - id: auth-service-public
+                  uri: ${AUTH_SERVICE_URI:http://localhost:8081}
+                  predicates:
+                      - Path=/api/v1/auth/login,/api/v1/auth/register,/api/v1/auth/refresh,/api/v1/auth/users/public/**,/api/v1/auth/search,/api/v1/auth/forget-password,/api/v1/auth/reset-password,/api/v1/auth/login/otp/send,/api/v1/auth/login/otp/verify
+                  filters:
+                      - name: RequestRateLimiter
+                        args:
+                            redis-rate-limiter.replenishRate: 10
+                            redis-rate-limiter.burstCapacity: 20
+                            redis-rate-limiter.requestedTokens: 1
+                            key-resolver: "#{@ipKeyResolver}"
+
+                - id: oauth2-flow
+                  uri: ${AUTH_SERVICE_URI:http://localhost:8081}
+                  predicates:
+                      - Path=/oauth2/**
+
+                - id: oauth2-login
+                  uri: ${AUTH_SERVICE_URI:http://localhost:8081}
+                  predicates:
+                      - Path=/login/**
+
+                - id: payment-webhook
+                  uri: lb://payment-service
+                  predicates:
+                      - Path=/api/v1/payments/webhook
+
+                - id: auth-service-protected
+                  uri: ${AUTH_SERVICE_URI:http://localhost:8081}
+                  predicates:
+                      - Path=/api/v1/auth/**
+                  filters:
+                      - AuthenticationFilter
+
+                - id: post-service-public-feed
+                  uri: ${POST_SERVICE_URI:http://localhost:8082}
+                  predicates:
+                      - Path=/api/v1/posts/public/**
+                      - Method=GET
+
+                - id: post-service-public-post
+                  uri: ${POST_SERVICE_URI:http://localhost:8082}
+                  predicates:
+                      - Path=/api/v1/posts/{postId}
+                      - Method=GET
+
+                - id: post-service
+                  uri: ${POST_SERVICE_URI:http://localhost:8082}
+                  predicates:
+                      - Path=/api/v1/posts/**
+                  filters:
+                      - AuthenticationFilter
+
+                - id: comment-service
+                  uri: ${COMMENT_SERVICE_URI:http://localhost:8083}
+                  predicates:
+                      - Path=/api/v1/comments/**
+                  filters:
+                      - AuthenticationFilter
+
+                - id: notification-service
+                  uri: ${NOTIFICATION_SERVICE_URI:http://localhost:8086}
+                  predicates:
+                      - Path=/api/v1/notifications/**
+                  filters:
+                      - AuthenticationFilter
+
+                - id: follow-service
+                  uri: ${FOLLOW_SERVICE_URI:http://localhost:8085}
+                  predicates:
+                      - Path=/api/v1/follows/**
+                  filters:
+                      - AuthenticationFilter
+
+                - id: like-service
+                  uri: ${LIKE_SERVICE_URI:http://localhost:8084}
+                  predicates:
+                      - Path=/api/v1/likes/**
+                  filters:
+                      - AuthenticationFilter
+
+                - id: media-service
+                  uri: ${MEDIA_SERVICE_URI:http://localhost:8088}
+                  predicates:
+                      - Path=/api/v1/media/**,/api/v1/stories/**
+                  filters:
+                      - AuthenticationFilter
+
+                - id: search-service
+                  uri: ${SEARCH_SERVICE_URI:http://localhost:8087}
+                  predicates:
+                      - Path=/api/v1/search/**,/api/v1/hashtags/**
+                  filters:
+                      - AuthenticationFilter
+
+                - id: report-service
+                  uri: ${REPORT_SERVICE_URI:http://localhost:8089}
+                  predicates:
+                      - Path=/api/v1/reports/**
+                  filters:
+                      - AuthenticationFilter
+
+                - id: message-service
+                  uri: ${MESSAGE_SERVICE_URI:http://localhost:8090}
+                  predicates:
+                      - Path=/api/v1/messages/**
+                  filters:
+                      - AuthenticationFilter
+
+                - id: message-service-ws
+                  uri: ${MESSAGE_SERVICE_WS_URI:ws://localhost:8090}
+                  predicates:
+                      - Path=/ws-message/**
+                      - Header=Upgrade, websocket
+                  filters:
+                      - AuthenticationFilter
+
+                - id: message-service-sockjs
+                  uri: ${MESSAGE_SERVICE_URI:http://localhost:8090}
+                  predicates:
+                      - Path=/ws-message/**
+                  filters:
+                      - AuthenticationFilter
+
+                - id: payment-service
+                  uri: ${PAYMENT_SERVICE_URI:http://localhost:8091}
+                  predicates:
+                      - Path=/api/v1/payments/**
+                  filters:
+                      - AuthenticationFilter
+
+                - id: admin-service
+                  uri: ${ADMIN_SERVICE_URI:http://localhost:8092}
+                  predicates:
+                      - Path=/api/v1/admin/**
+                  filters:
+                      - AuthenticationFilter
+
+jwt:
+    secret: ${JWT_SECRET}
+
+eureka:
+    client:
+        register-with-eureka: true
+        fetch-registry: true
+        serviceUrl:
+            defaultZone: http://localhost:8761/eureka/
+    instance:
+        hostname: localhost
