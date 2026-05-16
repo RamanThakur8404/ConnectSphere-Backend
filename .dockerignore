@@ -1,0 +1,10 @@
+.m2
+.idea
+.metadata
+.settings
+.sonarlint
+logs
+*/logs
+*.zip
+*.log
+.DS_Store
