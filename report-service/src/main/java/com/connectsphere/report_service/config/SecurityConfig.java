@@ -7,6 +7,8 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -23,6 +25,13 @@ public class SecurityConfig {
 
 	private final HeaderAuthenticationFilter headerAuthFilter;
 
+	@Bean
+	public UserDetailsService userDetailsService() {
+		return username -> {
+			throw new UsernameNotFoundException("Local username/password authentication is disabled");
+		};
+	}
+
 	// Defines security rules for API endpoints.
 	@Bean
 	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -38,8 +47,8 @@ public class SecurityConfig {
 						.requestMatchers(HttpMethod.POST, "/api/v1/reports").authenticated()
 
 						// Admin-only endpoints
-						.requestMatchers("/api/v1/reports/stats").hasRole("ADMIN").requestMatchers("/api/v1/reports/user/**")
-						.hasRole("ADMIN")
+						.requestMatchers("/api/v1/reports/stats").hasRole("ADMIN")
+						.requestMatchers("/api/v1/reports/user/**").authenticated()
 
 						// Admin or Moderator endpoints
 						.requestMatchers("/api/v1/reports/queue").hasAnyRole("ADMIN", "MODERATOR")

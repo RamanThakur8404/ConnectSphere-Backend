@@ -5,6 +5,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -114,7 +115,14 @@ public class ReportController {
     @Operation(summary = "Get reports by user")
     public ResponseEntity<ApiResponse<Page<ReportResponseDto>>> getReportsByUser(
             @PathVariable Integer userId,
+            @RequestHeader("X-User-Id") Integer requesterId,
+            @RequestHeader(value = "X-User-Role", defaultValue = "USER") String requesterRole,
             @PageableDefault(size = 20) Pageable pageable) {
+
+        boolean privileged = "ADMIN".equalsIgnoreCase(requesterRole) || "MODERATOR".equalsIgnoreCase(requesterRole);
+        if (!privileged && !userId.equals(requesterId)) {
+            throw new AccessDeniedException("Users can only view their own reports");
+        }
 
         return ResponseEntity.ok(ApiResponse.success("User reports retrieved", reportService.getReportsByUser(userId, pageable)));
     }

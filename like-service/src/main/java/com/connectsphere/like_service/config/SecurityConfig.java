@@ -7,6 +7,8 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -21,6 +23,13 @@ public class SecurityConfig {
 
 	private static final String[] SWAGGER_PATHS = { "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs",
 			"/v3/api-docs/**", "/swagger-resources/**", "/webjars/**" };
+
+	@Bean
+	public UserDetailsService userDetailsService() {
+		return username -> {
+			throw new UsernameNotFoundException("Local username/password authentication is disabled");
+		};
+	}
 
 	@Bean
 	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
