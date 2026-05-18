@@ -2,9 +2,11 @@ package com.connectsphere.auth.config;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import com.connectsphere.auth.constant.AuthProvider;
 import com.connectsphere.auth.constant.Role;
@@ -13,7 +15,6 @@ import com.connectsphere.auth.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 
-// DataSeeder — runs ONCE on every application startup.
 @Component
 @RequiredArgsConstructor
 public class DataSeeder implements CommandLineRunner {
@@ -23,35 +24,55 @@ public class DataSeeder implements CommandLineRunner {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    // -----------------------------------------------------------------------
-    // Default admin credentials — override via environment variables in prod
-    // -----------------------------------------------------------------------
-    private static final String ADMIN_EMAIL    = "admin@connectsphere.com";
-    private static final String ADMIN_USERNAME = "superadmin";
-    private static final String ADMIN_PASSWORD = "Admin@1234"; // Change in prod!
+    @Value("${app.seed.admin.enabled:false}")
+    private boolean adminSeedEnabled;
+
+    @Value("${app.seed.admin.email:}")
+    private String adminEmail;
+
+    @Value("${app.seed.admin.username:}")
+    private String adminUsername;
+
+    @Value("${app.seed.admin.password:}")
+    private String adminPassword;
+
+    @Value("${app.seed.admin.full-name:}")
+    private String adminFullName;
 
     @Override
     public void run(String... args) {
+        if (!adminSeedEnabled) {
+            log.info("DataSeeder: Admin seed disabled.");
+            return;
+        }
 
-        // Only seed if no admin with this email already exists
-        if (userRepository.findByEmail(ADMIN_EMAIL).isPresent()) {
-            log.info("DataSeeder: Admin already exists — skipping seed.");
+        if (!hasRequiredAdminSeedConfig()) {
+            log.warn("DataSeeder: Admin seed enabled but email, username, or password is missing. Skipping seed.");
+            return;
+        }
+
+        if (userRepository.findByEmail(adminEmail).isPresent()) {
+            log.info("DataSeeder: Admin already exists. Skipping seed.");
             return;
         }
 
         User admin = User.builder()
-                .username(ADMIN_USERNAME)
-                .email(ADMIN_EMAIL)
-                .passwordHash(passwordEncoder.encode(ADMIN_PASSWORD))
-                .fullName("Super Admin")
+                .username(adminUsername)
+                .email(adminEmail)
+                .passwordHash(passwordEncoder.encode(adminPassword))
+                .fullName(StringUtils.hasText(adminFullName) ? adminFullName : adminUsername)
                 .role(Role.ADMIN)
                 .provider(AuthProvider.LOCAL)
                 .active(true)
                 .build();
 
         userRepository.save(admin);
+        log.info("DataSeeder: ADMIN created. email={}", adminEmail);
+    }
 
-        log.info("DataSeeder: Default ADMIN created — email: {}", ADMIN_EMAIL);
-        log.warn("DataSeeder: Please change the default admin password before going to production!");
+    private boolean hasRequiredAdminSeedConfig() {
+        return StringUtils.hasText(adminEmail)
+                && StringUtils.hasText(adminUsername)
+                && StringUtils.hasText(adminPassword);
     }
 }

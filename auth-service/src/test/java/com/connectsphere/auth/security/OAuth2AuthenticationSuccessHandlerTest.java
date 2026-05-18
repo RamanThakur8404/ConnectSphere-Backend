@@ -1,6 +1,5 @@
 package com.connectsphere.auth.security;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
@@ -70,7 +69,9 @@ class OAuth2AuthenticationSuccessHandlerTest {
 
 		// Assert
 		String redirectedUrl = response.getRedirectedUrl();
-		assertEquals("http://localhost:5173/auth/callback", redirectedUrl);
+		assertTrue(redirectedUrl.startsWith("http://localhost:5173/auth/callback?"));
+		assertTrue(redirectedUrl.contains("accessToken=dummy.jwt.token"));
+		assertTrue(redirectedUrl.contains("refreshToken=dummy.refresh.token"));
 
 		verify(redisTokenService, times(1)).storeRefreshToken("test@google.com", "dummy.refresh.token");
 		verify(userRepository, times(1)).save(mockUser);

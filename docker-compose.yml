@@ -76,7 +76,9 @@ services:
       - connectsphere-network
 
   eureka-server:
-    image: connectsphere/eureka-server:latest
+    cpus: 0.5
+    mem_limit: 512m
+    image: ramanthakur06/eureka-server:latest
     container_name: connectsphere-eureka-server
     restart: unless-stopped
     build:
@@ -85,6 +87,10 @@ services:
     environment:
       <<: *java-env
       SPRING_PROFILES_ACTIVE: prod
+      JAVA_TOOL_OPTIONS: >
+        -Xms128M
+        -Xmx256m
+        -XX:+UseSerialGC
     ports:
       - "8761:8761"
     healthcheck:
@@ -99,7 +105,9 @@ services:
       - connectsphere-network
 
   api-gateway:
-    image: connectsphere/api-gateway:latest
+    cpus: 0.5
+    mem_limit: 512m
+    image: ramanthakur06/api-gateway:latest
     container_name: connectsphere-api-gateway
     restart: unless-stopped
     build:
@@ -107,6 +115,10 @@ services:
       dockerfile: Dockerfile
     environment:
       <<: *java-env
+      JAVA_TOOL_OPTIONS: >
+        -Xms128M
+        -Xmx256m
+        -XX:+UseSerialGC
       SPRING_PROFILES_ACTIVE: prod
       JWT_SECRET: ${JWT_SECRET}
       REDIS_HOST: redis
@@ -145,7 +157,9 @@ services:
       - connectsphere-network
 
   auth-service:
-    image: connectsphere/auth-service:latest
+    cpus: 0.5
+    mem_limit: 512m
+    image: ramanthakur06/auth-service:latest
     container_name: connectsphere-auth-service
     restart: unless-stopped
     build:
@@ -153,6 +167,10 @@ services:
       dockerfile: Dockerfile
     environment:
       <<: *spring-db-env
+      JAVA_TOOL_OPTIONS: >
+        -Xms128M
+        -Xmx256m
+        -XX:+UseSerialGC
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:mysql://mysql:3306/auth_db
       DB_USERNAME: ${DB_USERNAME}
@@ -165,6 +183,13 @@ services:
       RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
       EUREKA_SERVER: http://eureka-server:8761/eureka/
+      OAUTH2_GOOGLE_REDIRECT_URI: ${OAUTH2_GOOGLE_REDIRECT_URI}
+      FRONTEND_OAUTH2_REDIRECT_URI: ${FRONTEND_OAUTH2_REDIRECT_URI}
+      APP_SEED_ADMIN_ENABLED: ${APP_SEED_ADMIN_ENABLED:-false}
+      APP_SEED_ADMIN_EMAIL: ${APP_SEED_ADMIN_EMAIL:-}
+      APP_SEED_ADMIN_USERNAME: ${APP_SEED_ADMIN_USERNAME:-}
+      APP_SEED_ADMIN_PASSWORD: ${APP_SEED_ADMIN_PASSWORD:-}
+      APP_SEED_ADMIN_FULL_NAME: ${APP_SEED_ADMIN_FULL_NAME:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_SECRET_KEY: ${GOOGLE_SECRET_KEY}
       MAIL_USERNAME: ${MAIL_USERNAME}
@@ -192,7 +217,9 @@ services:
       - connectsphere-network
 
   post-service:
-    image: connectsphere/post-service:latest
+    cpus: 0.5
+    mem_limit: 512m
+    image: ramanthakur06/post-service:latest
     container_name: connectsphere-post-service
     restart: unless-stopped
     build:
@@ -200,6 +227,10 @@ services:
       dockerfile: Dockerfile
     environment:
       <<: *spring-db-env
+      JAVA_TOOL_OPTIONS: >
+        -Xms128M
+        -Xmx256m
+        -XX:+UseSerialGC
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:mysql://mysql:3306/post_db
       DB_USERNAME: ${DB_USERNAME}
@@ -229,7 +260,9 @@ services:
       - connectsphere-network
 
   comment-service:
-    image: connectsphere/comment-service:latest
+    cpus: 0.5
+    mem_limit: 512m
+    image: ramanthakur06/comment-service:latest
     container_name: connectsphere-comment-service
     restart: unless-stopped
     build:
@@ -237,6 +270,10 @@ services:
       dockerfile: Dockerfile
     environment:
       <<: *spring-db-env
+      JAVA_TOOL_OPTIONS: >
+        -Xms128M
+        -Xmx256m
+        -XX:+UseSerialGC
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:mysql://mysql:3306/comment_db
       DB_USERNAME: ${DB_USERNAME}
@@ -261,7 +298,9 @@ services:
       - connectsphere-network
 
   like-service:
-    image: connectsphere/like-service:latest
+    cpus: 0.5
+    mem_limit: 512m
+    image: ramanthakur06/like-service:latest
     container_name: connectsphere-like-service
     restart: unless-stopped
     build:
@@ -269,6 +308,10 @@ services:
       dockerfile: Dockerfile
     environment:
       <<: *spring-db-env
+      JAVA_TOOL_OPTIONS: >
+        -Xms128M
+        -Xmx256m
+        -XX:+UseSerialGC
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:mysql://mysql:3306/like_db
       DB_USERNAME: ${DB_USERNAME}
@@ -293,7 +336,9 @@ services:
       - connectsphere-network
 
   follow-service:
-    image: connectsphere/follow-service:latest
+    cpus: 0.5
+    mem_limit: 512m
+    image: ramanthakur06/follow-service:latest
     container_name: connectsphere-follow-service
     restart: unless-stopped
     build:
@@ -301,6 +346,10 @@ services:
       dockerfile: Dockerfile
     environment:
       <<: *spring-db-env
+      JAVA_TOOL_OPTIONS: >
+        -Xms128M
+        -Xmx256m
+        -XX:+UseSerialGC
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:mysql://mysql:3306/follow_db
       DB_USERNAME: ${DB_USERNAME}
@@ -326,7 +375,9 @@ services:
       - connectsphere-network
 
   notification-service:
-    image: connectsphere/notification-service:latest
+    cpus: 0.5
+    mem_limit: 512m
+    image: ramanthakur06/notification-service:latest
     container_name: connectsphere-notification-service
     restart: unless-stopped
     build:
@@ -334,6 +385,10 @@ services:
       dockerfile: Dockerfile
     environment:
       <<: *spring-db-env
+      JAVA_TOOL_OPTIONS: >
+        -Xms128M
+        -Xmx256m
+        -XX:+UseSerialGC
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:mysql://mysql:3306/notification_db
       DB_USERNAME: ${DB_USERNAME}
@@ -368,7 +423,9 @@ services:
       - connectsphere-network
 
   search-service:
-    image: connectsphere/search-service:latest
+    cpus: 0.5
+    mem_limit: 512m
+    image: ramanthakur06/search-service:latest
     container_name: connectsphere-search-service
     restart: unless-stopped
     build:
@@ -376,6 +433,10 @@ services:
       dockerfile: Dockerfile
     environment:
       <<: *spring-db-env
+      JAVA_TOOL_OPTIONS: >
+        -Xms128M
+        -Xmx256m
+        -XX:+UseSerialGC
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:mysql://mysql:3306/search_db
       DB_USERNAME: ${DB_USERNAME}
@@ -405,7 +466,9 @@ services:
       - connectsphere-network
 
   media-service:
-    image: connectsphere/media-service:latest
+    cpus: 0.5
+    mem_limit: 512m
+    image: ramanthakur06/media-service:latest
     container_name: connectsphere-media-service
     restart: unless-stopped
     build:
@@ -413,6 +476,10 @@ services:
       dockerfile: Dockerfile
     environment:
       <<: *spring-db-env
+      JAVA_TOOL_OPTIONS: >
+        -Xms128M
+        -Xmx256m
+        -XX:+UseSerialGC
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:mysql://mysql:3306/media_db
       DB_USERNAME: ${DB_USERNAME}
@@ -423,7 +490,7 @@ services:
       RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
       MEDIA_STORAGE_PROVIDER: local
-      MEDIA_PUBLIC_BASE_URL: http://localhost:8080
+      MEDIA_PUBLIC_BASE_URL: ${MEDIA_PUBLIC_BASE_URL}
       CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
       CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
       CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
@@ -452,9 +519,9 @@ services:
       - connectsphere-network
 
   report-service:
-    profiles:
-      - report
-    image: connectsphere/report-service:latest
+    cpus: 0.5
+    mem_limit: 512m
+    image: ramanthakur06/report-service:latest
     container_name: connectsphere-report-service
     restart: unless-stopped
     build:
@@ -462,6 +529,10 @@ services:
       dockerfile: Dockerfile
     environment:
       <<: *spring-db-env
+      JAVA_TOOL_OPTIONS: >
+        -Xms128M
+        -Xmx256m
+        -XX:+UseSerialGC
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:mysql://mysql:3306/report_db
       DB_USERNAME: ${DB_USERNAME}
@@ -494,9 +565,9 @@ services:
       - connectsphere-network
 
   message-service:
-    profiles:
-      - message
-    image: connectsphere/message-service:latest
+    cpus: 0.5
+    mem_limit: 512m
+    image: ramanthakur06/message-service:latest
     container_name: connectsphere-message-service
     restart: unless-stopped
     build:
@@ -504,6 +575,10 @@ services:
       dockerfile: Dockerfile
     environment:
       <<: *spring-db-env
+      JAVA_TOOL_OPTIONS: >
+        -Xms128M
+        -Xmx256m
+        -XX:+UseSerialGC
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:mysql://mysql:3306/message_db
       DB_USERNAME: ${DB_USERNAME}
@@ -537,9 +612,9 @@ services:
       - connectsphere-network
 
   payment-service:
-    profiles:
-      - payment
-    image: connectsphere/payment-service:latest
+    cpus: 0.5
+    mem_limit: 512m
+    image: ramanthakur06/payment-service:latest
     container_name: connectsphere-payment-service
     restart: unless-stopped
     build:
@@ -547,6 +622,10 @@ services:
       dockerfile: Dockerfile
     environment:
       <<: *spring-db-env
+      JAVA_TOOL_OPTIONS: >
+        -Xms128M
+        -Xmx256m
+        -XX:+UseSerialGC
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:mysql://mysql:3306/payment_db
       DB_USERNAME: ${DB_USERNAME}
@@ -582,9 +661,9 @@ services:
       - connectsphere-network
 
   admin-service:
-    profiles:
-      - admin
-    image: connectsphere/admin-service:latest
+    cpus: 0.5
+    mem_limit: 512m
+    image: ramanthakur06/admin-service:latest
     container_name: connectsphere-admin-service
     restart: unless-stopped
     build:
@@ -592,6 +671,10 @@ services:
       dockerfile: Dockerfile
     environment:
       <<: *spring-db-env
+      JAVA_TOOL_OPTIONS: >
+        -Xms128M
+        -Xmx256m
+        -XX:+UseSerialGC
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:mysql://mysql:3306/admin_db
       DB_USERNAME: ${DB_USERNAME}

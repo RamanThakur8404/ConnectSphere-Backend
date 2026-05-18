@@ -11,6 +11,7 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import com.connectsphere.auth.entity.User;
 import com.connectsphere.auth.repository.UserRepository;
@@ -79,7 +80,12 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         response.addHeader(HttpHeaders.SET_COOKIE, buildCookie("refreshToken", refreshToken, REFRESH_COOKIE_MAX_AGE));
 
         log.info("OAuth2 login successful — email: {}, redirecting to frontend", email);
-        getRedirectStrategy().sendRedirect(request, response, redirectUri);
+        getRedirectStrategy().sendRedirect(request, response, UriComponentsBuilder.fromUriString(redirectUri)
+                .queryParam("accessToken", accessToken)
+                .queryParam("refreshToken", refreshToken)
+                .build()
+                .encode()
+                .toUriString());
     }
 
     private String buildCookie(String name, String value, int maxAge) {
