@@ -1,0 +1,712 @@
+x-java-env: &java-env
+  JAVA_TOOL_OPTIONS: "-XX:MaxRAM=512m"
+  EUREKA_CLIENT_INITIAL_INSTANCE_INFO_REPLICATION_INTERVAL_SECONDS: 5
+  EUREKA_CLIENT_REGISTRY_FETCH_INTERVAL_SECONDS: 5
+  EUREKA_INSTANCE_LEASE_RENEWAL_INTERVAL_IN_SECONDS: 10
+
+x-spring-db-env: &spring-db-env
+  <<: *java-env
+  SPRING_JPA_HIBERNATE_DDL_AUTO: update
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: connectsphere-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: auth_db
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mysqladmin ping -h localhost -uroot -p$${MYSQL_ROOT_PASSWORD}
+      interval: 10s
+      timeout: 20s
+      retries: 10
+      start_period: 30s
+    networks:
+      - connectsphere-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: connectsphere-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 10s
+      timeout: 20s
+      retries: 10
+      start_period: 10s
+    networks:
+      - connectsphere-network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: connectsphere-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test:
+        - CMD
+        - rabbitmq-diagnostics
+        - -q
+        - ping
+      interval: 10s
+      timeout: 20s
+      retries: 10
+      start_period: 30s
+    networks:
+      - connectsphere-network
+
+  eureka-server:
+    cpus: 0.5
+    mem_limit: 512m
+    image: ramanthakur06/eureka-server:latest
+    container_name: connectsphere-eureka-server
+    restart: unless-stopped
+    build:
+      context: ./eureka-server
+      dockerfile: Dockerfile
+    environment:
+      <<: *java-env
+      SPRING_PROFILES_ACTIVE: prod
+      JAVA_TOOL_OPTIONS: >
+        -Xms128M
+        -Xmx256m
+        -XX:+UseSerialGC
+    ports:
+      - "8761:8761"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q --spider http://localhost:8761/ || exit 1
+      interval: 10s
+      timeout: 20s
+      retries: 15
+      start_period: 30s
+    networks:
+      - connectsphere-network
+
+  api-gateway:
+    cpus: 0.5
+    mem_limit: 512m
+    image: ramanthakur06/api-gateway:latest
+    container_name: connectsphere-api-gateway
+    restart: unless-stopped
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    environment:
+      <<: *java-env
+      JAVA_TOOL_OPTIONS: >
+        -Xms128M
+        -Xmx256m
+        -XX:+UseSerialGC
+      SPRING_PROFILES_ACTIVE: prod
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_HOST: redis
+      SPRING_DATA_REDIS_HOST: redis
+      EUREKA_SERVER: http://eureka-server:8761/eureka/
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      AUTH_SERVICE_URI: http://auth-service:8081
+      POST_SERVICE_URI: http://post-service:8082
+      COMMENT_SERVICE_URI: http://comment-service:8083
+      LIKE_SERVICE_URI: http://like-service:8084
+      FOLLOW_SERVICE_URI: http://follow-service:8085
+      NOTIFICATION_SERVICE_URI: http://notification-service:8086
+      SEARCH_SERVICE_URI: http://search-service:8087
+      MEDIA_SERVICE_URI: http://media-service:8088
+      REPORT_SERVICE_URI: http://report-service:8089
+      MESSAGE_SERVICE_URI: http://message-service:8090
+      MESSAGE_SERVICE_WS_URI: ws://message-service:8090
+      PAYMENT_SERVICE_URI: http://payment-service:8091
+      ADMIN_SERVICE_URI: http://admin-service:8092
+    ports:
+      - "8080:8080"
+    depends_on:
+      eureka-server:
+        condition: service_started
+      redis:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q --spider http://localhost:8080/actuator/health || exit 1
+      interval: 10s
+      timeout: 20s
+      retries: 10
+      start_period: 300s
+    networks:
+      - connectsphere-network
+
+  auth-service:
+    cpus: 0.5
+    mem_limit: 512m
+    image: ramanthakur06/auth-service:latest
+    container_name: connectsphere-auth-service
+    restart: unless-stopped
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    environment:
+      <<: *spring-db-env
+      JAVA_TOOL_OPTIONS: >
+        -Xms128M
+        -Xmx256m
+        -XX:+UseSerialGC
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:mysql://mysql:3306/auth_db
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      AUTH_DB_USERNAME: ${DB_USERNAME}
+      AUTH_DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_HOST: redis
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      EUREKA_SERVER: http://eureka-server:8761/eureka/
+      OAUTH2_GOOGLE_REDIRECT_URI: ${OAUTH2_GOOGLE_REDIRECT_URI}
+      FRONTEND_OAUTH2_REDIRECT_URI: ${FRONTEND_OAUTH2_REDIRECT_URI}
+      APP_SEED_ADMIN_ENABLED: ${APP_SEED_ADMIN_ENABLED:-false}
+      APP_SEED_ADMIN_EMAIL: ${APP_SEED_ADMIN_EMAIL:-}
+      APP_SEED_ADMIN_USERNAME: ${APP_SEED_ADMIN_USERNAME:-}
+      APP_SEED_ADMIN_PASSWORD: ${APP_SEED_ADMIN_PASSWORD:-}
+      APP_SEED_ADMIN_FULL_NAME: ${APP_SEED_ADMIN_FULL_NAME:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_SECRET_KEY: ${GOOGLE_SECRET_KEY}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+    ports:
+      - "8081:8081"
+    depends_on:
+      mysql:
+        condition: service_started
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+      eureka-server:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q --spider http://localhost:8081/actuator/health || exit 1
+      interval: 10s
+      timeout: 20s
+      retries: 10
+      start_period: 300s
+    networks:
+      - connectsphere-network
+
+  post-service:
+    cpus: 0.5
+    mem_limit: 512m
+    image: ramanthakur06/post-service:latest
+    container_name: connectsphere-post-service
+    restart: unless-stopped
+    build:
+      context: ./post-service
+      dockerfile: Dockerfile
+    environment:
+      <<: *spring-db-env
+      JAVA_TOOL_OPTIONS: >
+        -Xms128M
+        -Xmx256m
+        -XX:+UseSerialGC
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:mysql://mysql:3306/post_db
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      EUREKA_SERVER: http://eureka-server:8761/eureka/
+    ports:
+      - "8082:8082"
+    depends_on:
+      mysql:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+      eureka-server:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q --spider http://localhost:8082/actuator/health || exit 1
+      interval: 10s
+      timeout: 20s
+      retries: 10
+      start_period: 300s
+    networks:
+      - connectsphere-network
+
+  comment-service:
+    cpus: 0.5
+    mem_limit: 512m
+    image: ramanthakur06/comment-service:latest
+    container_name: connectsphere-comment-service
+    restart: unless-stopped
+    build:
+      context: ./comment-service
+      dockerfile: Dockerfile
+    environment:
+      <<: *spring-db-env
+      JAVA_TOOL_OPTIONS: >
+        -Xms128M
+        -Xmx256m
+        -XX:+UseSerialGC
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:mysql://mysql:3306/comment_db
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      EUREKA_SERVER: http://eureka-server:8761/eureka/
+    ports:
+      - "8083:8083"
+    depends_on:
+      mysql:
+        condition: service_started
+      eureka-server:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q --spider http://localhost:8083/actuator/health || exit 1
+      interval: 10s
+      timeout: 20s
+      retries: 10
+      start_period: 300s
+    networks:
+      - connectsphere-network
+
+  like-service:
+    cpus: 0.5
+    mem_limit: 512m
+    image: ramanthakur06/like-service:latest
+    container_name: connectsphere-like-service
+    restart: unless-stopped
+    build:
+      context: ./like-service
+      dockerfile: Dockerfile
+    environment:
+      <<: *spring-db-env
+      JAVA_TOOL_OPTIONS: >
+        -Xms128M
+        -Xmx256m
+        -XX:+UseSerialGC
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:mysql://mysql:3306/like_db
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      EUREKA_SERVER: http://eureka-server:8761/eureka/
+    ports:
+      - "8084:8084"
+    depends_on:
+      mysql:
+        condition: service_started
+      eureka-server:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q --spider http://localhost:8084/actuator/health || exit 1
+      interval: 10s
+      timeout: 20s
+      retries: 10
+      start_period: 300s
+    networks:
+      - connectsphere-network
+
+  follow-service:
+    cpus: 0.5
+    mem_limit: 512m
+    image: ramanthakur06/follow-service:latest
+    container_name: connectsphere-follow-service
+    restart: unless-stopped
+    build:
+      context: ./follow-service
+      dockerfile: Dockerfile
+    environment:
+      <<: *spring-db-env
+      JAVA_TOOL_OPTIONS: >
+        -Xms128M
+        -Xmx256m
+        -XX:+UseSerialGC
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:mysql://mysql:3306/follow_db
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      EUREKA_SERVER: http://eureka-server:8761/eureka/
+    ports:
+      - "8085:8085"
+    depends_on:
+      mysql:
+        condition: service_started
+      eureka-server:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q --spider http://localhost:8085/actuator/health || exit 1
+      interval: 10s
+      timeout: 20s
+      retries: 10
+      start_period: 300s
+    networks:
+      - connectsphere-network
+
+  notification-service:
+    cpus: 0.5
+    mem_limit: 512m
+    image: ramanthakur06/notification-service:latest
+    container_name: connectsphere-notification-service
+    restart: unless-stopped
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    environment:
+      <<: *spring-db-env
+      JAVA_TOOL_OPTIONS: >
+        -Xms128M
+        -Xmx256m
+        -XX:+UseSerialGC
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:mysql://mysql:3306/notification_db
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      EUREKA_SERVER: http://eureka-server:8761/eureka/
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+    ports:
+      - "8086:8086"
+    depends_on:
+      mysql:
+        condition: service_started
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+      eureka-server:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q --spider http://localhost:8086/actuator/health || exit 1
+      interval: 10s
+      timeout: 20s
+      retries: 10
+      start_period: 300s
+    networks:
+      - connectsphere-network
+
+  search-service:
+    cpus: 0.5
+    mem_limit: 512m
+    image: ramanthakur06/search-service:latest
+    container_name: connectsphere-search-service
+    restart: unless-stopped
+    build:
+      context: ./search-service
+      dockerfile: Dockerfile
+    environment:
+      <<: *spring-db-env
+      JAVA_TOOL_OPTIONS: >
+        -Xms128M
+        -Xmx256m
+        -XX:+UseSerialGC
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:mysql://mysql:3306/search_db
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      EUREKA_SERVER: http://eureka-server:8761/eureka/
+    ports:
+      - "8087:8087"
+    depends_on:
+      mysql:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+      eureka-server:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q --spider http://localhost:8087/actuator/health || exit 1
+      interval: 10s
+      timeout: 20s
+      retries: 10
+      start_period: 300s
+    networks:
+      - connectsphere-network
+
+  media-service:
+    cpus: 0.5
+    mem_limit: 512m
+    image: ramanthakur06/media-service:latest
+    container_name: connectsphere-media-service
+    restart: unless-stopped
+    build:
+      context: ./media-service
+      dockerfile: Dockerfile
+    environment:
+      <<: *spring-db-env
+      JAVA_TOOL_OPTIONS: >
+        -Xms128M
+        -Xmx256m
+        -XX:+UseSerialGC
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:mysql://mysql:3306/media_db
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      EUREKA_SERVER: http://eureka-server:8761/eureka/
+      REDIS_HOST: redis
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      MEDIA_STORAGE_PROVIDER: local
+      MEDIA_PUBLIC_BASE_URL: ${MEDIA_PUBLIC_BASE_URL}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+    ports:
+      - "8088:8088"
+    volumes:
+      - ./media-service/uploads:/app/uploads
+    depends_on:
+      mysql:
+        condition: service_started
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+      eureka-server:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q --spider http://localhost:8088/actuator/health || exit 1
+      interval: 10s
+      timeout: 20s
+      retries: 10
+      start_period: 300s
+    networks:
+      - connectsphere-network
+
+  report-service:
+    cpus: 0.5
+    mem_limit: 512m
+    image: ramanthakur06/report-service:latest
+    container_name: connectsphere-report-service
+    restart: unless-stopped
+    build:
+      context: ./report-service
+      dockerfile: Dockerfile
+    environment:
+      <<: *spring-db-env
+      JAVA_TOOL_OPTIONS: >
+        -Xms128M
+        -Xmx256m
+        -XX:+UseSerialGC
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:mysql://mysql:3306/report_db
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      EUREKA_HOST: eureka-server
+      EUREKA_SERVER: http://eureka-server:8761/eureka/
+      AI_PROVIDER: RULE_BASED
+    ports:
+      - "8089:8089"
+    depends_on:
+      mysql:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+      eureka-server:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q --spider http://localhost:8089/actuator/health || exit 1
+      interval: 10s
+      timeout: 20s
+      retries: 10
+      start_period: 300s
+    networks:
+      - connectsphere-network
+
+  message-service:
+    cpus: 0.5
+    mem_limit: 512m
+    image: ramanthakur06/message-service:latest
+    container_name: connectsphere-message-service
+    restart: unless-stopped
+    build:
+      context: ./message-service
+      dockerfile: Dockerfile
+    environment:
+      <<: *spring-db-env
+      JAVA_TOOL_OPTIONS: >
+        -Xms128M
+        -Xmx256m
+        -XX:+UseSerialGC
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:mysql://mysql:3306/message_db
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      MESSAGE_DB_URL: jdbc:mysql://mysql:3306/message_db
+      MESSAGE_DB_USERNAME: ${DB_USERNAME}
+      MESSAGE_DB_PASSWORD: ${DB_PASSWORD}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      EUREKA_SERVER: http://eureka-server:8761/eureka/
+      AUTH_SERVICE_URI: http://auth-service:8081
+    ports:
+      - "8090:8090"
+    depends_on:
+      mysql:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+      eureka-server:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q --spider http://localhost:8090/actuator/health || exit 1
+      interval: 10s
+      timeout: 20s
+      retries: 10
+      start_period: 300s
+    networks:
+      - connectsphere-network
+
+  payment-service:
+    cpus: 0.5
+    mem_limit: 512m
+    image: ramanthakur06/payment-service:latest
+    container_name: connectsphere-payment-service
+    restart: unless-stopped
+    build:
+      context: ./payment-service
+      dockerfile: Dockerfile
+    environment:
+      <<: *spring-db-env
+      JAVA_TOOL_OPTIONS: >
+        -Xms128M
+        -Xmx256m
+        -XX:+UseSerialGC
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:mysql://mysql:3306/payment_db
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      EUREKA_SERVER: http://eureka-server:8761/eureka/
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET}
+    ports:
+      - "8091:8091"
+    depends_on:
+      mysql:
+        condition: service_started
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+      eureka-server:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q --spider http://localhost:8091/actuator/health || exit 1
+      interval: 10s
+      timeout: 20s
+      retries: 10
+      start_period: 300s
+    networks:
+      - connectsphere-network
+
+  admin-service:
+    cpus: 0.5
+    mem_limit: 512m
+    image: ramanthakur06/admin-service:latest
+    container_name: connectsphere-admin-service
+    restart: unless-stopped
+    build:
+      context: ./admin-service
+      dockerfile: Dockerfile
+    environment:
+      <<: *spring-db-env
+      JAVA_TOOL_OPTIONS: >
+        -Xms128M
+        -Xmx256m
+        -XX:+UseSerialGC
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:mysql://mysql:3306/admin_db
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      EUREKA_SERVER: http://eureka-server:8761/eureka/
+    ports:
+      - "8092:8092"
+    depends_on:
+      mysql:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+      eureka-server:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q --spider http://localhost:8092/actuator/health || exit 1
+      interval: 10s
+      timeout: 20s
+      retries: 10
+      start_period: 300s
+    networks:
+      - connectsphere-network
+
+volumes:
+  mysql-data:
+
+networks:
+  connectsphere-network:
+    driver: bridge
