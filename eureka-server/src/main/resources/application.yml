@@ -1,0 +1,26 @@
+server:
+  # The port your Eureka service registry runs on. 8761 is the standard default port for Eureka.
+  port: 8761
+
+spring:
+  application:
+    # Service ID used within the registry to identify this running instance.
+    name: eureka-server
+
+eureka:
+  instance:
+    # ConnectSphere runs locally for now, so we specify localhost.
+    # In production, this would be an actual domain/IP.
+    hostname: localhost
+  client:
+    # A Eureka server operates primarily as a service directory, not a client.
+    # Why: We set register-with-eureka to 'false' to prevent the server from trying to register itself.
+    register-with-eureka: false
+    # Why: And we set fetch-registry to 'false' because it IS the registry; it doesn't need to fetch a copy from elsewhere.
+    fetch-registry: false
+    
+    # We specify the default zone where the server exposes its Eureka service endpoint.
+    serviceUrl:
+      defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
+
+# Enables Eureka dashboard out of the box so we can visually verify services are registered at localhost:8761/

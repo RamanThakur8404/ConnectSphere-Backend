@@ -1,0 +1,73 @@
+# Environment files
+.env
+.env.local
+.env.*.local
+**/.env
+**/.env.local
+**/.env.*.local
+!.env.example
+!**/.env.example
+
+# Maven / Java build output
+target/
+**/target/
+build/
+**/build/
+out/
+**/out/
+*.class
+*.jar
+*.war
+*.ear
+
+# Test, coverage, and analysis output
+coverage/
+**/coverage/
+.scannerwork/
+**/.scannerwork/
+jacoco.exec
+**/jacoco.exec
+
+# Logs and runtime files
+logs/
+**/logs/
+*.log
+hs_err_pid*.log
+replay_pid*.log
+*.pid
+*.hprof
+local-run/pids/
+local-run/logs/
+
+# IDE and editor files
+.idea/
+.vscode/
+.metadata/
+**/.idea/
+**/.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Eclipse / STS files
+.classpath
+.project
+.settings/
+.factorypath
+.apt_generated/
+.springBeans
+.sts4-cache/
+
+# Local dependency/cache directories
+.m2/
+**/.m2/
+
+# Node artifacts if any backend tooling creates them
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+
+# OS files
+.DS_Store
+Thumbs.db
